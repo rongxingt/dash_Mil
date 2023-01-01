@@ -11,7 +11,6 @@ import dash_bootstrap_components as dbc
 
 # local imports
 from utils.images import logo_encoded
-from components.login import login_info
 
 # component
 navbar = dbc.Navbar(
@@ -40,12 +39,9 @@ navbar = dbc.Navbar(
                         ),
                         dbc.NavItem(
                             dbc.NavLink(
-                                'Complex Page',
-                                href='/complex'
+                                'Consultants',
+                                href='/consultants'
                             )
-                        ),
-                        html.Div(
-                            login_info
                         )
                     ]
                 ),
@@ -54,8 +50,8 @@ navbar = dbc.Navbar(
             ),
         ]
     ),
-    color='dark',
-    dark=True,
+    color="primary",
+    dark = True
 )
 
 # add callback for toggling the collapse on small screens

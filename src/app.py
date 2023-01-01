@@ -5,27 +5,19 @@ This is where we define the various css items to fetch as well as the layout of 
 '''
 
 # package imports
-import dash
-from dash import html
+import base64
+import io
+
+from dash_extensions.enrich import Dash, html, dcc, Output, Input, page_container, State
 import dash_bootstrap_components as dbc
-from flask import Flask
-from flask_login import LoginManager
-import os
+import pandas as pd
 
 # local imports
-from utils.settings import APP_HOST, APP_PORT, APP_DEBUG, DEV_TOOLS_PROPS_CHECK
-from components.login import User, login_location
-from components import navbar, footer
+from components import navbar
 
-server = Flask(__name__)
-app = dash.Dash(
+app = Dash(
     __name__,
-    server=server,
     use_pages=True,    # turn on Dash pages
-    external_stylesheets=[
-        dbc.themes.BOOTSTRAP,
-        dbc.icons.FONT_AWESOME
-    ],  # fetch the proper css items we want
     meta_tags=[
         {   # check if device is a mobile device. This is a must if you do any mobile styling
             'name': 'viewport',
@@ -33,47 +25,108 @@ app = dash.Dash(
         }
     ],
     suppress_callback_exceptions=True,
-    title='Dash app structure'
+    title='Dash app structure',
 )
 
-server.config.update(SECRET_KEY=os.getenv('SECRET_KEY'))
 
-# Login manager object will be used to login / logout users
-login_manager = LoginManager()
-login_manager.init_app(server)
-login_manager.login_view = '/login'
-
-@login_manager.user_loader
-def load_user(username):
-    """This function loads the user by user id. Typically this looks up the user from a user database.
-    We won't be registering or looking up users in this example, since we'll just login using LDAP server.
-    So we'll simply return a User object with the passed in username.
-    """
-    return User(username)
 
 def serve_layout():
     '''Define the layout of the application'''
     return html.Div(
         [
-            login_location,
             navbar,
+            dbc.Container([ # this code section taken from Dash docs https://dash.plotly.com/dash-core-components/upload
+               dbc.Row([
+                   dbc.Col([
+                       dcc.Upload(
+                            id='upload-data',
+                            children=html.Div([
+                                'Drag and Drop or ',
+                                html.A('Select Files')
+                            ]),
+                            style={
+                                'width': '100%',
+                                'height': '60px',
+                                'lineHeight': '60px',
+                                'borderWidth': '1px',
+                                'borderStyle': 'dashed',
+                                'borderRadius': '5px',
+                                'textAlign': 'center',
+                                'margin': '10px'
+                            },
+                            multiple=False)
+                    ])
+                ]),
+                dbc.Row([
+                    html.Div([
+                        dbc.Card(children="", id= "f_name", body = True)
+                    ]),        
+                ]),
+                dbc.Row([
+                    dbc.Col([
+                        dbc.Button("Upload", id="btn", color="info", class_name= "border rounded", type = "submit")
+                    ],
+                    className="d-grid gap-2 d-md-fkex justify-content-md-end")
+                ]),
+                dcc.Loading(dcc.Store(id="store"), fullscreen=True, type="dot")
+            ], id = "upload_component"),
             dbc.Container(
-                dash.page_container,
+                page_container,
                 class_name='my-2'
             ),
-            footer
         ]
     )
 
+def parse_contents(contents, filename):
+    content_type, content_string = contents.split(',')
 
+    decoded = base64.b64decode(content_string)
+    try:
+        if 'csv' in filename:
+            # Assume that the user uploaded a CSV file
+            df = pd.read_csv(
+                io.StringIO(decoded.decode('utf-8')))
+        elif 'xls' in filename:
+            # Assume that the user uploaded an excel file
+            df = pd.read_excel(io.BytesIO(decoded))
+    except Exception as e:
+        print(e)
+        return html.Div([
+            'There was an error processing this file.'
+        ])
+    
+    # Data transformation
+    df["period"] = df["period"].astype(str)
+    df["total_hours"] = df["total_hours"].astype(float)
+    df["client_suffix"] = df["client_suffix"].astype(str).str.zfill(2)
+    df["project_code"] = df["client_code"]+"-"+df["client_suffix"]
+    df.sort_values(by=['period'], inplace = True)
+    
+    return df
+
+@app.callback(Output("f_name", "children"),
+          Input("upload-data", "contents"),
+          State("upload-data", "filename"),
+)
+def select_data(content, filename):
+    return filename
+
+
+@app.callback(Output("store", "data"),
+              Output("upload_component", "style"),
+              Input("btn", "n_clicks"),
+              State("upload-data", "contents"),
+              State("upload-data", "filename"),
+              prevent_initial_call=True)
+def upload_data(n_clicks, content, filename):
+    ddf = parse_contents(content, filename)
+    return ddf.to_dict('records'), {'display': 'none'}
+
+
+              
 app.layout = serve_layout   # set the layout to the serve_layout function
 server = app.server         # the server is needed to deploy the application
 
 if __name__ == "__main__":
-    app.run_server(
-        host=APP_HOST,
-        port=APP_PORT,
-        debug=APP_DEBUG,
-        dev_tools_props_check=DEV_TOOLS_PROPS_CHECK
-    )
+    app.run_server(debug=True, port= 8062)
 
