@@ -248,17 +248,11 @@ sup {
 }
 
 a {
-  color: var(--bs-link-color);
+  color: #1EAEDB; 
   text-decoration: underline;
-}
+  cursor: pointer;}
 a:hover {
-  color: var(--bs-link-hover-color);
-}
-
-a:not([href]):not([class]), a:not([href]):not([class]):hover {
-  color: inherit;
-  text-decoration: none;
-}
+  color: #0FA0CE; }
 
 pre,
 code,

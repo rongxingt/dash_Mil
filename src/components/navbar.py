@@ -16,17 +16,6 @@ from utils.images import logo_encoded
 navbar = dbc.Navbar(
     dbc.Container(
         [
-            html.A(
-                dbc.Row(
-                    [
-                        dbc.Col(html.Img(src=logo_encoded, height='30px')),
-                    ],
-                    align='center',
-                    className='g-0',
-                ),
-                href='https://plotly.com',
-                style={'textDecoration': 'none'},
-            ),
             dbc.NavbarToggler(id='navbar-toggler', n_clicks=0),
             dbc.Collapse(
                 dbc.Nav(
@@ -42,12 +31,29 @@ navbar = dbc.Navbar(
                                 'Consultants',
                                 href='/consultants'
                             )
-                        )
+                        ),
+                        dbc.NavItem(
+                            dbc.NavLink(
+                                'Project',
+                                href='/project'
+                            )
+                        ),
                     ]
                 ),
                 id='navbar-collapse',
                 navbar=True
             ),
+            html.A(
+                dbc.Row(
+                    [   
+                        dbc.Col(html.Img(src=logo_encoded, height='50px')),
+                    ],
+                    align='center',
+                    className='float-end',
+                ),
+                href='https://www.my-milliman.com/en-gb/',
+                style={'textDecoration': 'none'},
+            )
         ]
     ),
     color="primary",

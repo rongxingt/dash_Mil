@@ -65,7 +65,6 @@ def init_graph(data):
     
     df = pd.DataFrame(data)
     cons_name = df['name_fam_last_first'].unique()
-    print(cons_name)
     return [dcc.Dropdown(id='cons_dropdown',
                         options= cons_name,
                         value=cons_name[0],  # initial value displayed when page first loads
@@ -85,6 +84,7 @@ def init_graph(data):
 )
 def update_graph(cons_name, disp_level, data):  # function arguments come from the component property of the Input    
     df = pd.DataFrame(data)
+    
     if cons_name is None:
         return {}, {}
         

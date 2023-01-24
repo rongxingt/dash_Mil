@@ -4,12 +4,11 @@ Created on Fri Dec  2 00:42:11 2022
 
 @author: rongx
 """
-import base64
-import io
 
 from dash import callback, register_page
-from dash_extensions.enrich import Output, Input, State, ServersideOutput, html, dcc, Trigger  # pip install dash-extensions
+from dash_extensions.enrich import Output, Input, State, html, dcc  # pip install dash-extensions
 import dash_bootstrap_components as dbc
+import plotly.express as px
 
 import pandas as pd
 
@@ -20,90 +19,98 @@ register_page(
     title='Home'
 )
 
-layout = dbc.Container([]) # this code section taken from Dash docs https://dash.plotly.com/dash-core-components/upload
-#     dbc.Row([
-#         dbc.Col([
-#             dcc.Upload(
-#                 id='upload-data',
-#                 children=html.Div([
-#                     'Drag and Drop or ',
-#                     html.A('Select Files')
-#                 ]),
-#                 style={
-#                     'width': '100%',
-#                     'height': '60px',
-#                     'lineHeight': '60px',
-#                     'borderWidth': '1px',
-#                     'borderStyle': 'dashed',
-#                     'borderRadius': '5px',
-#                     'textAlign': 'center',
-#                     'margin': '10px'
-#                 },
-#                 multiple=False)
-#         ])
-#     ]),
-#     dbc.Row([
-#         html.Div([
-#             dbc.Card(children="", id= "f_name", body = True)
-#         ]),        
-#     ]),
-#     dbc.Row([
-#         dbc.Col([
-#             dbc.Button("Upload", id="btn", color="info", class_name= "border rounded", type = "submit")
-#         ],
-#         className="d-grid gap-2 d-md-fkex justify-content-md-end")
-#     ]),
-#     dbc.Row([
-#         html.Div([
-#             dbc.Card(children="", id= "status", body = True)
-#         ]),        
-#     ]),
-#     dcc.Store(id="store", data=[], storage_type='memory')
-# ], id = "upload_component")
+aggregate_dropdown = dcc.Dropdown(id = 'aggregate_dropdown',
+                                options=['Incremental', 'Cummulative'],
+                                value = 'Incremental',
+                                clearable=False,
+                                persistence=True,
+                                persistence_type='session')
 
-# def parse_contents(contents, filename):
-#     content_type, content_string = contents.split(',')
+detailed_dropdown = dcc.Dropdown(id = 'detailed_dropdown',
+                                options=['Incremental', 'Cummulative'],
+                                value = 'Incremental',
+                                clearable=False,
+                                persistence=True,
+                                persistence_type='session')
 
-#     decoded = base64.b64decode(content_string)
-#     try:
-#         if 'csv' in filename:
-#             # Assume that the user uploaded a CSV file
-#             df = pd.read_csv(
-#                 io.StringIO(decoded.decode('utf-8')))
-#         elif 'xls' in filename:
-#             # Assume that the user uploaded an excel file
-#             df = pd.read_excel(io.BytesIO(decoded))
-#     except Exception as e:
-#         print(e)
-#         return html.Div([
-#             'There was an error processing this file.'
-#         ])
+layout = dbc.Container([
+    dbc.Row([
+        dbc.Col([aggregate_dropdown], width=3)
+    ]),
+    dbc.Row([
+        dbc.Col(html.Div(id='lgraph1_container', children=[]))
+    ]),
+    dbc.Row([
+        dbc.Col([detailed_dropdown], width=3)
+    ]),
+    dbc.Row([
+        dbc.Col(html.Div(id='lgraph2_container', children=[]))
+    ])
+], id = 'home_component', style = {'display': 'none'})
+
+@callback(
+    Output('lgraph1_container', 'children'),
+    Output('home_component', 'style'),
+    Input(aggregate_dropdown, 'value'),
+    Input('store', 'data'),
+)
+def lgraph1(agg, data):
     
-#     # Data transformation
-#     df["period"] = df["period"].astype(str)
-#     df["total_hours"] = df["total_hours"].astype(float)
-#     df["client_suffix"] = df["client_suffix"].astype(str).str.zfill(2)
-#     df["project_code"] = df["client_code"]+"-"+df["client_suffix"]
-#     df.sort_values(by=['period'], inplace = True)
+    if data is None:
+        return [[], {'display': 'none'}]
     
-#     return df
-
-# @callback(Output("f_name", "children"),
-#           Input("upload-data", "contents"),
-#           State("upload-data", "filename"))
-# def select_data(content, filename):
-#     return filename
-
-
-# @callback(ServersideOutput("store", "data"),
-#               Output("status", "children"),
-#               Trigger("btn", "n_clicks"),
-#               State("upload-data", "contents"),
-#               State("upload-data", "filename"),
-#               prevent_initial_call=True)
-# def upload_data(n_clicks, content, filename):
-#     ddf = parse_contents(content, filename)
-#     return ddf.to_dict('records'), "Success!"
-
-
+    df = pd.DataFrame(data)
     
+    if agg == "Incremental":
+        
+        fig1 = px.line(data_frame = df.groupby('period')['total_hours'].sum(),
+                       labels = {'value': 'Billable Hours'},
+                       markers = True,
+                       height = 750)
+        
+    else:
+        
+        fig1 = px.line(data_frame = df.groupby('period')['total_hours'].sum().cumsum(),
+                       labels = {'value': 'Billable Hours'},
+                       markers = True,
+                       height = 750)
+    
+    fig1.update_layout(showlegend=False)
+    return [dcc.Graph(figure = fig1), {'display': 'block'}]
+
+@callback(
+    Output('lgraph2_container', 'children'),
+    Input(detailed_dropdown, 'value'),
+    Input('store', 'data'),
+)
+def lgraph2(agg, data):
+    
+    if data is None:
+        return []
+    
+    df = pd.DataFrame(data)
+    
+    if agg == "Incremental":
+        
+        fig2 = px.line(data_frame = df.groupby(['period', 'name_fam_last_first'])['total_hours'].sum().to_frame().reset_index(),
+                       x = 'period',
+                       y = 'total_hours',
+                       color = 'name_fam_last_first',
+                       labels = {'value': 'Billable Hours'},
+                       markers = True,
+                       height = 750)
+        
+    else:
+        
+        dff = df.groupby(['period', 'name_fam_last_first'])['total_hours'].sum().to_frame().reset_index()
+        dff['cum_sum'] = (dff.groupby('name_fam_last_first')['total_hours'].cumsum())
+        
+        fig2 = px.line(data_frame = dff,
+                       x = 'period',
+                       y = 'cum_sum',
+                       color = 'name_fam_last_first',
+                       labels = {'cum_sum': 'Billable Hours', 'name_fam_last_first': 'Name'},
+                       markers = True,
+                       height = 750)
+    
+    return dcc.Graph(figure = fig2)
